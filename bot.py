@@ -1,9 +1,12 @@
 import asyncio
 import datetime
 
+from aiogram.types import CallbackQuery
+
 from forms import RunForm, SneakersForm
 from db import DBmanager
 from config import config
+from keyboards import miss_field, check_data
 
 from aiogram.filters import Command, StateFilter
 
@@ -101,8 +104,6 @@ async def process_run_form(message: types.Message, state: FSMContext):
     await message.answer_photo(photo=run_data["track"],
                                caption=f'Пробежка на <b>{run_data["distance"]}</b> км сохранена.',
                                parse_mode=ParseMode.HTML)
-    # await message.answer(f'Пробежка на <b>{run_data["distance"]}</b> км сохранена.',
-    #                      parse_mode=ParseMode.HTML)
 
 
 @dp.message(StateFilter(None), Command("sadd"))
@@ -124,8 +125,17 @@ async def process_sneakers_form(message: types.Message, state: FSMContext):
 async def process_sneakers_form(message: types.Message, state: FSMContext):
     await state.update_data(model=message.text)
     await state.set_state(SneakersForm.photo)
-    await message.answer("Загрузи фото кроссовок",
+    await message.answer("Загрузи фото кроссовок", reply_markup=miss_field(),
                          parse_mode=ParseMode.HTML)
+
+
+@dp.callback_query(F.data, SneakersForm.photo)
+async def process_sneakers_form(call: CallbackQuery, state: FSMContext):
+    # await call.message.edit_reply_markup(reply_markup=None)
+    await state.update_data(photo=None)
+    await call.message.answer("Добавь описание", reply_markup=miss_field(),
+                              parse_mode=ParseMode.HTML)
+    await state.set_state(SneakersForm.description)
 
 
 @dp.message(F.photo, SneakersForm.photo)
@@ -133,30 +143,91 @@ async def process_sneakers_form(message: types.Message, state: FSMContext):
     photo_data = message.photo[-1]
     await state.update_data(photo=photo_data.file_id)
     await state.set_state(SneakersForm.description)
-    await message.answer("Добавь описание",
+    await message.answer("Добавь описание", reply_markup=miss_field(),
                          parse_mode=ParseMode.HTML)
 
 
-@dp.message(SneakersForm.description)
+@dp.callback_query(F.data, SneakersForm.description)
+async def process_sneakers_form(call: CallbackQuery, state: FSMContext):
+    # await call.message.edit_reply_markup(reply_markup=None)
+    await state.update_data(description=None)
+    await call.message.answer("Укажи пробег (если это дробное число, укажи через точку - 121.5)",
+                              reply_markup=miss_field(),
+                              parse_mode=ParseMode.HTML)
+    await state.set_state(SneakersForm.distance)
+
+
+@dp.message(F.text, SneakersForm.description)
 async def process_sneakers_form(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text)
     await state.set_state(SneakersForm.distance)
-    await message.answer("Укажи пробег",
+    await message.answer("Укажи пробег (если это дробное число, укажи через точку - 121.5)",
+                         reply_markup=miss_field(),
                          parse_mode=ParseMode.HTML)
 
 
-@dp.message(SneakersForm.distance)
+@dp.callback_query(F.data, SneakersForm.distance)
+async def process_sneakers_form(call: CallbackQuery, state: FSMContext):
+    # await call.message.edit_reply_markup(reply_markup=None)
+    await state.update_data(distance=0)
+    sneakers_data = await state.get_data()
+    caption = f'Пожалуйста, проверь все ли верно: \n\n' \
+              f'<b>Брэнд</b>: {sneakers_data["brand"]}\n' \
+              f'<b>Модель</b>: {sneakers_data["model"]}\n' \
+              f'<b>Дистанция</b>: {sneakers_data["distance"]} км\n' \
+              f'<b>Описание</b>: {sneakers_data["description"] if sneakers_data["description"] else '-'}\n'
+    if sneakers_data["photo"]:
+        await call.message.answer_photo(photo=sneakers_data["photo"],
+                                        caption=caption,
+                                        reply_markup=check_data(),
+                                        parse_mode=ParseMode.HTML)
+    else:
+        await call.message.answer(text=caption, reply_markup=check_data(), parse_mode=ParseMode.HTML)
+    await state.set_state(SneakersForm.check_state)
+
+
+@dp.message(F.text, SneakersForm.distance)
 async def process_sneakers_form(message: types.Message, state: FSMContext):
-    await state.update_data(distance=message.text)
+    try:
+        await state.update_data(distance=float(message.text))
+        sneakers_data = await state.get_data()
+        caption = f'Пожалуйста, проверь все ли верно: \n\n' \
+                  f'<b>Брэнд</b>: {sneakers_data["brand"]}\n' \
+                  f'<b>Модель</b>: {sneakers_data["model"]}\n' \
+                  f'<b>Дистанция</b>: {sneakers_data["distance"]} км\n' \
+                  f'<b>Описание</b>: {sneakers_data["description"] if sneakers_data["description"] else '-'}\n'
+        if sneakers_data["photo"]:
+            await message.answer_photo(photo=sneakers_data["photo"],
+                                       caption=caption,
+                                       reply_markup=check_data(),
+                                       parse_mode=ParseMode.HTML)
+        else:
+            await message.answer(text=caption, reply_markup=check_data(), parse_mode=ParseMode.HTML)
+        await state.set_state(SneakersForm.check_state)
+    except:
+        await message.answer("Неверный формат. Укажи пробег, если это дробное число, укажи через точку - 121.5",
+                             reply_markup=miss_field(),
+                             parse_mode=ParseMode.HTML)
+        await state.set_state(SneakersForm.distance)
+
+
+@dp.callback_query(F.data == 'correct', SneakersForm.check_state)
+async def process_sneakers_form(call: CallbackQuery, state: FSMContext):
     sneakers_data = await state.get_data()
     sneakers_data["create_date"] = datetime.datetime.now()
-    sneakers_data["user_id"] = message.from_user.id
-    sneakers_data["distance"] = float(sneakers_data["distance"])
+    sneakers_data["user_id"] = call.message.from_user.id
     await db_connect.add_sneakers(**sneakers_data)
     await state.clear()
-    await message.answer_photo(photo=sneakers_data["photo"],
-                               caption=f'Кроссовки <b>{sneakers_data["brand"]} {sneakers_data["model"]}</b> сохранены.',
-                               parse_mode=ParseMode.HTML)
+    await call.message.answer(text=f'Кроссовки <b>{sneakers_data["brand"]} {sneakers_data["model"]}</b> сохранены.',
+                              parse_mode=ParseMode.HTML)
+
+
+@dp.callback_query(F.data == 'incorrect', SneakersForm.check_state)
+async def process_sneakers_form(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.answer("Введи брэнд кроссовок\n",
+                              parse_mode=ParseMode.HTML)
+    await state.set_state(SneakersForm.brand)
 
 
 @dp.message(StateFilter(None), Command("run"))

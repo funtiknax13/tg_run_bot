@@ -19,7 +19,7 @@ class DBmanager:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sneakers (
                 sneakers_id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
+                user_id BIGINT NOT NULL,
                 brand VARCHAR(30) NOT NULL,
                 model VARCHAR(100),
                 photo TEXT,
@@ -32,7 +32,7 @@ class DBmanager:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS run (
                 run_id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
+                user_id BIGINT NOT NULL,
                 track TEXT NOT NULL,
                 run_date DATE NOT NULL,
                 distance REAL NOT NULL,

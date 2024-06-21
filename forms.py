@@ -8,6 +8,7 @@ class RunForm(StatesGroup):
     run_time = State()
     description = State()
     sneakers = State()
+    check_state = State()
 
 
 class SneakersForm(StatesGroup):
@@ -16,4 +17,5 @@ class SneakersForm(StatesGroup):
     photo = State()
     distance = State()
     description = State()
+    check_state = State()
 
