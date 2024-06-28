@@ -73,7 +73,7 @@ class DBmanager:
         conn = psycopg2.connect(dbname=self.db_name, **self.params)
         cur = conn.cursor()
         cur.execute(f"""SELECT * FROM run
-                    WHERE user_id = {user_id}""")
+                    WHERE user_id = {user_id} ORDER BY run_date""")
         data = cur.fetchall()
         conn.commit()
         cur.close()
@@ -103,9 +103,31 @@ class DBmanager:
         """
         conn = psycopg2.connect(dbname=self.db_name, **self.params)
         cur = conn.cursor()
-        cur.execute(f"""SELECT * FROM sneakers
-                    WHERE user_id = {user_id}""")
+        # cur.execute(f"""SELECT * FROM sneakers
+        #             WHERE user_id = {user_id}""")
+        cur.execute(f"""SELECT sneakers_id, user_id, brand, model, photo, distance, create_date, description,
+                    ((SELECT SUM(run.distance) FROM run
+                    WHERE run.sneakers = sneakers.sneakers_id) + distance)
+                    AS new_distance
+                    FROM sneakers
+                    WHERE user_id =  {user_id}""")
         data = cur.fetchall()
+        conn.commit()
+        cur.close()
+        conn.close()
+        return data
+
+    async def get_sneakers(self, sneakers_id: int):
+        """
+        Вывод пары кроссовок по id
+        :param sneakers_id: id кроссовок пользователя
+        :return:
+        """
+        conn = psycopg2.connect(dbname=self.db_name, **self.params)
+        cur = conn.cursor()
+        cur.execute(f"""SELECT * FROM sneakers
+                    WHERE sneakers_id = {sneakers_id}""")
+        data = cur.fetchone()
         conn.commit()
         cur.close()
         conn.close()

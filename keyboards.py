@@ -1,4 +1,23 @@
+from aiogram import types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+def main_menu():
+    kb = [
+        [
+            types.KeyboardButton(text="Добавить пробежку"),
+            types.KeyboardButton(text="Мои пробежки")
+        ],
+        [
+            types.KeyboardButton(text="Добавить кроссовки"),
+            types.KeyboardButton(text="Мои кроссовки")
+        ],
+    ]
+    keyboard = types.ReplyKeyboardMarkup(
+        keyboard=kb,
+        resize_keyboard=True,
+    )
+    return keyboard
 
 
 def check_data():
